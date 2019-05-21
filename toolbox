@@ -68,6 +68,7 @@ toolbox_container_prefix_default=""
 toolbox_image=""
 user_id_real=$(id -ru 2>&3)
 verbose=false
+xauth_file="/tmp/.toolbox.xauth"
 
 
 LGC='\033[1;32m' # Light Green Color
@@ -632,8 +633,10 @@ create()
     kcm_socket_bind=""
     monitor_host=""
     no_hosts=""
+    nvidia_device_binds=""
     tmpfs_size=$((64 * 1024 * 1024)) # 64 MiB
     toolbox_profile_bind=""
+    x11_binds=""
 
     # shellcheck disable=SC2153
     if [ "$DBUS_SYSTEM_BUS_ADDRESS" != "" ]; then
@@ -729,6 +732,12 @@ create()
         toolbox_profile_bind="--volume /etc/profile.d/toolbox.sh:/etc/profile.d/toolbox.sh:ro"
     fi
 
+    if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
+        nvidia_device_binds="--volume /dev/nvidia0:/dev/nvidia0:rw --volume /dev/nvidiactl:/dev/nvidiactl:rw"
+        xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f "$xauth_file" nmerge -
+        x11_binds="--volume /tmp/.X11-unix:/tmp/.X11-unix:rw --volume $xauth_file:$xauth_file:rw"
+    fi
+
     max_uid_count=65536
     max_minus_uid=$((max_uid_count - user_id_real))
     uid_plus_one=$((user_id_real + 1))
@@ -773,6 +782,8 @@ create()
             --volume /dev/bus:/dev/bus \
             --volume /dev/dri:/dev/dri \
             --volume /dev/fuse:/dev/fuse \
+            $nvidia_device_binds \
+            $x11_binds \
             --volume /media:/media:rslave \
             --volume /mnt:/mnt:rslave \
             --volume /run/media:/run/media:rslave \
@@ -912,6 +923,7 @@ run()
 
     create_toolbox_container=false
     prompt_for_create=true
+    xauthority_environment=""
 
     echo "$base_toolbox_command: checking if container $toolbox_container exists" >&3
 
@@ -1026,6 +1038,10 @@ run()
         fi
     fi
 
+    if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
+        xauthority_environment="--env XAUTHORITY=$xauth_file"
+    fi
+
     echo "$base_toolbox_command: running in container $toolbox_container:" >&3
     echo "$base_toolbox_command: $program" >&3
     for i in "$@"; do
@@ -1040,6 +1056,7 @@ run()
             --tty \
             --user "$USER" \
             $set_environment \
+            $xauthority_environment \
             "$toolbox_container" \
             capsh --caps="" -- -c 'cd "$1"; shift; exec "$@"' /bin/sh "$PWD" "$program" "$@" 2>&3
 )
