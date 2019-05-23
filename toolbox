@@ -734,7 +734,7 @@ create()
 
     if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
         nvidia_device_binds="--volume /dev/nvidia0:/dev/nvidia0:rw --volume /dev/nvidiactl:/dev/nvidiactl:rw"
-        xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f "$xauth_file" nmerge -
+        touch "$xauth_file"
         x11_binds="--volume /tmp/.X11-unix:/tmp/.X11-unix:rw --volume $xauth_file:$xauth_file:rw"
     fi
 
@@ -1039,6 +1039,9 @@ run()
     fi
 
     if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
+        if ! [ -f "$xauth_file" ] || ! [ -s "$xauth_file" ]; then
+            xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f "$xauth_file" nmerge -
+        fi
         xauthority_environment="--env XAUTHORITY=$xauth_file"
     fi
 
