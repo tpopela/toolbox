@@ -1004,6 +1004,13 @@ run()
         fi
     fi
 
+    if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
+        if ! [ -f "$xauth_file" ] || ! [ -s "$xauth_file" ]; then
+            xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f "$xauth_file" nmerge -
+        fi
+        xauthority_environment="--env XAUTHORITY=$xauth_file"
+    fi
+
     echo "$base_toolbox_command: trying to start container $toolbox_container" >&3
 
     if ! $prefix_sudo podman start "$toolbox_container" >/dev/null 2>&3; then
@@ -1036,13 +1043,6 @@ run()
             echo "$base_toolbox_command: command '$program' not found in container $toolbox_container" >&2
             exit 127
         fi
-    fi
-
-    if [ -e /dev/nvidia0 ] 2>&3 && [ -e /dev/nvidiactl ] 2>&3; then
-        if ! [ -f "$xauth_file" ] || ! [ -s "$xauth_file" ]; then
-            xauth nlist $DISPLAY | sed -e 's/^..../ffff/' | xauth -f "$xauth_file" nmerge -
-        fi
-        xauthority_environment="--env XAUTHORITY=$xauth_file"
     fi
 
     echo "$base_toolbox_command: running in container $toolbox_container:" >&3
